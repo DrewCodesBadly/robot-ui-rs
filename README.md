@@ -1,4 +1,4 @@
-# Lmaoui
+# Really Stupid FRC UI Idea
 
 silly frc rust ui  
 BLAZINGLY FAST  

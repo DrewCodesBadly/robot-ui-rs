@@ -1,5 +1,5 @@
 [package]
-name = "lmaoui"
+name = "robot-ui-rs"
 version = "0.1.0"
 edition = "2024"
 

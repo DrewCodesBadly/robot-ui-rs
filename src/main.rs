@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use egui::{CentralPanel, Context, DragValue, Id, Modal, SidePanel};
 use ntcore_sys::{NT_CreateInstance, NT_Inst, NT_SetServerTeam, NT_StartClient4};
-use video_rs::Decoder;
+use opencv::videoio::{CAP_ANY, VideoCapture};
 
 use crate::nt_util::{ListenedValues, NTValueType, add_listener, to_wpi_string};
 
@@ -24,7 +24,7 @@ struct FrcUi {
     port: u32,
     nt: NT_Inst,
     camera_ips: HashMap<String, String>,
-    camera_streams: HashMap<String, Decoder>,
+    camera_streams: HashMap<String, VideoCapture>,
     settings_modal_open: bool,
     listened_values: ListenedValues,
 }
@@ -74,9 +74,12 @@ impl FrcUi {
     // Sets up new camera streams based on the updated IP addresses.
     fn update_cameras(&mut self) {
         for (k, v) in &self.camera_ips {
-            let result = Decoder::new(format!("http://{}", v));
-            if let Ok(decoder) = result {
-                self.camera_streams.insert(k.clone(), decoder);
+            if let Ok(cap) = VideoCapture::from_file(&format!("http://{}", v), CAP_ANY) {
+                // This seems to block, causing slow startup.
+                // TODO: Async this - and other camera operations too...
+                self.camera_streams.insert(k.clone(), cap);
+            } else {
+                println!("Failed to initialize camera {} with ip {}", k, v);
             }
         }
     }
@@ -90,6 +93,19 @@ impl eframe::App for FrcUi {
             include_bytes!("assets/bbots25-field.png"),
         );
 
+        #[cfg(debug_assertions)]
+        {
+            use ntcore_sys::{NT_GetDouble, NT_GetEntry};
+
+            let h = unsafe { NT_GetEntry(self.nt, &to_wpi_string(nt_paths::GAME_TIME)) };
+            let d = unsafe { NT_GetDouble(h, -1.0) };
+            if d != -1.0 {
+                println!("Found NT Value for gameTime: {}", d);
+            } else {
+                println!("Could not find gameTime value.");
+            }
+        }
+
         components::top_bar::top_bar(ctx, &self.listened_values);
 
         components::central_panel::central_panel(ctx, self);
@@ -100,7 +116,7 @@ impl eframe::App for FrcUi {
                     ui.heading("Connection Settings");
                     ui.separator();
                     ui.heading("Camera IP Addresses - include ports! e.x. 1.2.3.4:5800");
-                    for entry in &mut self.cameras {
+                    for entry in &mut self.camera_ips {
                         ui.horizontal(|ui| {
                             ui.label(entry.0);
                             ui.text_edit_singleline(entry.1);

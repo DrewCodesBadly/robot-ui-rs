@@ -21,6 +21,7 @@ pub fn from_wpi_string(s: WPI_String) -> String {
     return original_string.clone();
 }
 
+#[derive(Debug)]
 pub enum NTValueType {
     Unknown,
     Boolean(bool),
@@ -53,7 +54,10 @@ pub fn add_listener(map: &mut HashMap<String, NTValueType>, entry_name: &str, in
 }
 
 // Does this segfault? Not clear on whether or not the topicInfo field is always there.
+// TODO: If this segfaults try swapping out for using the NT_GetValue{type} funcions.
 pub extern "C" fn nt_update(data: *mut c_void, event: *const NT_Event) {
+    #[cfg(debug_assertions)]
+    println!("Receiving NT Update...");
     let mut map = unsafe { data.cast::<HashMap<String, NTValueType>>().read() };
     let event = unsafe { event.read() };
 
@@ -82,6 +86,8 @@ pub extern "C" fn nt_update(data: *mut c_void, event: *const NT_Event) {
 
     let name = from_wpi_string(unsafe { event.data.topicInfo.name });
 
+    #[cfg(debug_assertions)]
+    println!("Setting NT Data: {} = {:?}", name, value);
     map.insert(name, value);
 }
 

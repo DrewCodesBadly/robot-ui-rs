@@ -1,12 +1,28 @@
 use egui::{CentralPanel, Color32, Frame, Image, Pos2, SidePanel, TopBottomPanel};
+use opencv::{
+    core::{Mat, Vector},
+    imgcodecs::imencode,
+    videoio::VideoCaptureTrait,
+};
 
 use crate::{FrcUi, nt_paths, nt_util::NTValueType};
 
 pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
     SidePanel::left("LeftCamerasPanel").show(ctx, |ui| {
         ui.vertical(|ui| {
-            for (name, stream) in app.camera_streams {
-                let img = stream.decode();
+            for (name, capture) in &mut app.camera_streams {
+                let mut mat = Mat::default();
+                if let Ok(true) = capture.read(&mut mat) {
+                    // re-encoding is jank but whatever I guess.
+                    // its easier and im tired.
+                    let mut buffer = Vector::new();
+                    if let Ok(true) = imencode(".png", &mat, &mut buffer, &Vector::new()) {
+                        ui.add(Image::from_bytes(
+                            "bytes://camera_bytes",
+                            buffer.as_slice().to_vec(),
+                        ));
+                    }
+                }
             }
         });
     });

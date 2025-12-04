@@ -42,7 +42,10 @@ pub fn add_listener(map: &mut HashMap<String, NTValueType>, entry_name: &str, in
     unsafe {
         NT_AddListener(
             entry,
-            NT_EventFlags_NT_EVENT_VALUE_ALL,
+            // .try_into().unwrap() should be safe since its an integer type.
+            // This is done since for some reason on another computer bindgen compiled
+            // an i32 instead of a u32 here and got confused.
+            NT_EventFlags_NT_EVENT_VALUE_ALL.try_into().unwrap(),
             (&raw mut *map).cast(),
             Some(nt_update),
         )

@@ -5,19 +5,9 @@ use crate::{FrcUi, nt_paths, nt_util::NTValueType};
 pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
     SidePanel::left("LeftCamerasPanel").show(ctx, |ui| {
         ui.vertical(|ui| {
-            // Absolutely no idea if this works.
-            ui.image(format!(
-                "https://{}",
-                app.cameras
-                    .get("ll-front")
-                    .unwrap_or(&String::from("missing.ip"))
-            ));
-            ui.image(format!(
-                "https://{}",
-                app.cameras
-                    .get("ll-back")
-                    .unwrap_or(&String::from("missing.ip"))
-            ));
+            for (name, stream) in app.camera_streams {
+                let img = stream.decode();
+            }
         });
     });
 

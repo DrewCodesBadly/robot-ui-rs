@@ -11,3 +11,4 @@ image = { version = "0.25.9", features = ["jpeg", "png"] }
 ntcore-sys = { path = "ntcore-sys" }
 reqwest = "0.12.24"
 tokio = "1.48.0"
+video-rs = "0.10.5"

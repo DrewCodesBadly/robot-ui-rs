@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use egui::{CentralPanel, Context, DragValue, Id, Modal, SidePanel};
 use ntcore_sys::{NT_CreateInstance, NT_Inst, NT_SetServerTeam, NT_StartClient4};
+use video_rs::Decoder;
 
 use crate::nt_util::{ListenedValues, NTValueType, add_listener, to_wpi_string};
 
@@ -22,17 +23,18 @@ struct FrcUi {
     team_number: u32,
     port: u32,
     nt: NT_Inst,
-    cameras: HashMap<String, String>,
+    camera_ips: HashMap<String, String>,
+    camera_streams: HashMap<String, Decoder>,
     settings_modal_open: bool,
     listened_values: ListenedValues,
 }
 
 impl FrcUi {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
-        let mut cameras = HashMap::new();
+        let mut camera_ips = HashMap::new();
         // Add cameras here
-        cameras.insert(String::from("ll-front"), String::from("0.0.0.0:5800"));
-        cameras.insert(String::from("ll-back"), String::from("0.0.0.0:5800"));
+        camera_ips.insert(String::from("ll-front"), String::from("0.0.0.0:5800"));
+        camera_ips.insert(String::from("ll-back"), String::from("0.0.0.0:5800"));
 
         // Set up NT
         let nt = unsafe { NT_CreateInstance() };
@@ -46,20 +48,36 @@ impl FrcUi {
         add_listener(&mut listened_values, nt_paths::LUNITE_COUNT, nt);
         add_listener(&mut listened_values, nt_paths::ROBOT_2D_POSITION, nt);
 
-        Self {
+        let mut s = Self {
             settings_modal_open: false,
             team_number: 1234,
             port: 5810,
+            camera_streams: HashMap::new(),
             nt,
-            cameras,
+            camera_ips,
             listened_values,
-        }
+        };
+
+        s.try_reconnect();
+        s.update_cameras();
+
+        s
     }
 
     // connects to rio
     fn try_reconnect(&mut self) {
         unsafe {
             NT_SetServerTeam(self.nt, self.team_number, self.port);
+        }
+    }
+
+    // Sets up new camera streams based on the updated IP addresses.
+    fn update_cameras(&mut self) {
+        for (k, v) in &self.camera_ips {
+            let result = Decoder::new(format!("http://{}", v));
+            if let Ok(decoder) = result {
+                self.camera_streams.insert(k.clone(), decoder);
+            }
         }
     }
 }
@@ -101,21 +119,24 @@ impl eframe::App for FrcUi {
                                 ui.add(DragValue::new(&mut self.port).speed(1))
                             })
                         });
-                        if ui.button("Connect to Robot").clicked() {
-                            self.try_reconnect()
-                        }
                     });
 
                     ui.separator();
-                    if ui.button("Close").clicked() {
+                    if ui.button("Save, Reconnect and Close").clicked() {
+                        self.try_reconnect();
+                        self.update_cameras();
                         self.settings_modal_open = false;
                     }
                 });
             });
 
             if modal.should_close() {
+                self.try_reconnect();
+                self.update_cameras();
                 self.settings_modal_open = false;
             }
         }
+
+        ctx.request_repaint(); // spam repaint just to be safe. lots of values change.
     }
 }

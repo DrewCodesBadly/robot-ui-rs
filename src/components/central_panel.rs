@@ -148,7 +148,7 @@ pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
                     }
                 });
 
-                columns[2].centered_and_justified(|ui| ui.label("Add more here later maybe?"));
+                // columns[2].centered_and_justified(|ui| ui.label("Add more here later maybe?"));
             });
         });
         ui.separator();

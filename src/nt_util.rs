@@ -96,7 +96,7 @@ pub fn format_game_time(time: Option<f64>) -> String {
         let time_s = f.ceil() as i32;
         format!("{}:{}", time_s / 60, time_s % 60)
     } else {
-        String::from("--:--")
+        String::from("WAITING FOR MATCH START")
     }
 }
 

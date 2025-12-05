@@ -1,9 +1,9 @@
-use std::{collections::HashMap, ptr::slice_from_raw_parts};
+use std::collections::HashMap;
 
 use egui::{Context, DragValue, Id, Modal};
 use ntcore_sys::{
-    NT_CreateInstance, NT_GetDouble, NT_GetDoubleArray, NT_GetString, NT_GetStringArray, NT_Inst,
-    NT_SetServerTeam, NT_StartClient4, WPI_String,
+    NT_CreateInstance, NT_GetBoolean, NT_GetDouble, NT_GetDoubleArray, NT_GetString,
+    NT_GetStringArray, NT_Inst, NT_SetServerTeam, NT_StartClient4, WPI_String,
 };
 use opencv::videoio::{CAP_ANY, VideoCapture};
 
@@ -33,8 +33,6 @@ struct FrcUi {
     camera_streams: HashMap<String, VideoCapture>,
     settings_modal_open: bool,
     listened_values: ListenedValues,
-
-    tmp: u32,
 }
 
 impl FrcUi {
@@ -66,8 +64,6 @@ impl FrcUi {
             nt,
             camera_ips,
             listened_values,
-
-            tmp: 200,
         };
 
         s.try_reconnect();
@@ -187,6 +183,15 @@ impl FrcUi {
             nt_paths::AUTO_CHOOSER_ACTIVE.to_string(),
             NTValueType::String(from_wpi_string(selected_auto)),
         );
+
+        // FMS
+        let is_red =
+            unsafe { NT_GetBoolean(get_entry_handle(nt_paths::FMS_IS_RED_ALLIANCE, self.nt), 0) }
+                == 1;
+        self.listened_values.insert(
+            nt_paths::FMS_IS_RED_ALLIANCE.to_string(),
+            NTValueType::Boolean(is_red),
+        );
     }
 }
 
@@ -197,10 +202,18 @@ impl eframe::App for FrcUi {
             "bytes://bbots25-field.png",
             include_bytes!("assets/bbots25-field.png"),
         );
+        ctx.all_styles_mut(|style| {
+            style.override_font_id = Some(egui::FontId {
+                size: 16.0,
+                family: egui::FontFamily::Proportional,
+            });
+        });
 
         self.update_nt_values();
 
-        components::top_bar::top_bar(ctx, &self.listened_values);
+        components::left_panel::left_panel(ctx, self);
+
+        components::bottom_panel::bottom_panel(ctx, self);
 
         components::central_panel::central_panel(ctx, self);
 

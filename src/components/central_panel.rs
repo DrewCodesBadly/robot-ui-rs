@@ -1,8 +1,8 @@
 use std::{iter::repeat_n, ptr::slice_from_raw_parts};
 
 use egui::{
-    Button, CentralPanel, Color32, ColorImage, ComboBox, Frame, Image, Pos2, SidePanel,
-    TopBottomPanel, load::SizedTexture,
+    Button, CentralPanel, Color32, ColorImage, ComboBox, FontId, Frame, Image, Pos2, SidePanel,
+    TextFormat, TopBottomPanel, load::SizedTexture, text::LayoutJob,
 };
 use ntcore_sys::NT_SetString;
 use opencv::{
@@ -16,91 +16,10 @@ use crate::{
     FrcUi,
     components::input_descriptions::show_input_bindings,
     nt_paths,
-    nt_util::{NTValueType, get_entry_handle, to_wpi_string},
+    nt_util::{NTValueType, format_game_time, get_entry_handle, to_wpi_string},
 };
 
 pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
-    SidePanel::left("LeftCamerasPanel").show(ctx, |ui| {
-        ui.vertical(|ui| {
-            for (name, capture) in &mut app.camera_streams {
-                ui.label(format!("Camera Feed: {}", name));
-                let mut mat = Mat::default();
-                // If capture failed, show a blank image.
-                if capture.read(&mut mat).ok().filter(|b| *b).is_none() {
-                    // Black screen
-                    mat = Mat::zeros(480, 640, CV_8UC3)
-                        .expect("base mat should be valid")
-                        .to_mat()
-                        .expect("base mat should be valid");
-
-                    // Changing image (for testing purposes)
-                    // let zeros_mat = Mat::zeros(480, 640, CV_8UC3)
-                    //     .expect("base mat should be valid")
-                    //     .to_mat()
-                    //     .expect("base mat should be valid");
-                    // app.tmp = (app.tmp + 1) % 256;
-                    // println!("{}", app.tmp);
-                    // let _ = opencv::core::add(
-                    //     &zeros_mat,
-                    //     &(app.tmp as f64),
-                    //     &mut mat,
-                    //     &Mat::ones(480, 640, CV_8U).unwrap().to_mat().unwrap(),
-                    //     CV_8UC3,
-                    // );
-                }
-                let unsafe_slice =
-                    unsafe { slice_from_raw_parts(mat.data(), mat.total() * 3).as_ref() };
-                if let Some(slice) = unsafe_slice {
-                    let image =
-                        ColorImage::from_rgb([mat.cols() as usize, mat.rows() as usize], slice);
-                    let tex =
-                        ctx.load_texture(&format!("camera-{}", name), image, Default::default());
-                    ui.add(
-                        Image::new(SizedTexture::from_handle(&tex))
-                            .maintain_aspect_ratio(true)
-                            .shrink_to_fit(),
-                    );
-                }
-            }
-        });
-    });
-
-    TopBottomPanel::bottom("BottomPanel").show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            if ui.button("Connection Settings").clicked() {
-                app.settings_modal_open = true;
-            }
-            let auto_chooser_box = ComboBox::new("AutoChooserBox", "selected as current auto.");
-            let mut selected = {
-                let val = app.listened_values.get(nt_paths::AUTO_CHOOSER_ACTIVE);
-                if let Some(NTValueType::String(s)) = val {
-                    s.to_owned()
-                } else {
-                    String::from("None")
-                }
-            };
-            auto_chooser_box
-                .selected_text(selected.clone())
-                .show_ui(ui, |inner_ui| {
-                    if let Some(NTValueType::StringArray(arr)) =
-                        app.listened_values.get(nt_paths::AUTO_CHOOSER_OPTIONS)
-                    {
-                        for option in arr {
-                            inner_ui.selectable_value(&mut selected, option.to_owned(), option);
-                        }
-                    }
-                });
-
-            unsafe {
-                NT_SetString(
-                    get_entry_handle(nt_paths::AUTO_CHOOSER_ACTIVE, app.nt),
-                    0,
-                    &to_wpi_string(&selected),
-                )
-            };
-        });
-    });
-
     CentralPanel::default().show(ctx, |ui| {
         // Get bot position
         let bot_pos = if let Some(NTValueType::DoubleArray(arr)) =
@@ -152,7 +71,87 @@ pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
                 }
             }
         });
+        ui.separator();
+        let gt_string = format!(
+            "{} - ",
+            format_game_time(app.listened_values.get(nt_paths::GAME_TIME).and_then(|v| {
+                if let NTValueType::Double(f) = *v {
+                    Some(f)
+                } else {
+                    None
+                }
+            }))
+        );
+        let mut job = LayoutJob::default();
+        job.append(
+            &gt_string,
+            0.0,
+            TextFormat {
+                font_id: FontId::proportional(25.0),
+                ..Default::default()
+            },
+        );
+        if let Some(NTValueType::Boolean(true)) =
+            app.listened_values.get(nt_paths::FMS_IS_RED_ALLIANCE)
+        {
+            job.append(
+                "RED ",
+                0.0,
+                TextFormat {
+                    font_id: FontId::proportional(25.0),
+                    color: Color32::from_rgb(255, 50, 50),
+                    ..Default::default()
+                },
+            );
+        } else {
+            job.append(
+                "BLUE ",
+                0.0,
+                TextFormat {
+                    font_id: FontId::proportional(25.0),
+                    color: Color32::from_rgb(50, 50, 255),
+                    ..Default::default()
+                },
+            );
+        }
+        job.append(
+            "ALLIANCE",
+            0.0,
+            TextFormat {
+                font_id: FontId::proportional(25.0),
+                ..Default::default()
+            },
+        );
 
+        ui.label(job);
+        ui.separator();
+
+        ui.horizontal(|ui| {
+            ui.columns(3, |columns| {
+                // State
+                columns[0].centered_and_justified(|ui| {
+                    let state = app.listened_values.get(nt_paths::CURRENT_STATE);
+                    if let Some(NTValueType::String(s)) = state {
+                        ui.label(format!("Current State: {}", s));
+                    } else {
+                        ui.label("Current State: Unknown");
+                    }
+                });
+
+                // Lunite count
+                columns[1].centered_and_justified(|ui| {
+                    let lunites = app.listened_values.get(nt_paths::LUNITE_COUNT);
+                    if let Some(NTValueType::Double(n)) = lunites {
+                        ui.label(format!("Lunite Count: {}", n.floor() as i32));
+                    } else {
+                        ui.label("Lunite Count: Unknown");
+                    }
+                });
+
+                columns[2].centered_and_justified(|ui| ui.label("Add more here later maybe?"));
+            });
+        });
+        ui.separator();
         show_input_bindings(ui, app);
     });
 }

@@ -8,6 +8,7 @@ eframe = "0.33.2"
 egui = "0.33.2"
 egui_extras = { version = "0.33.2", features = ["all_loaders"] }
 image = { version = "0.25.9", features = ["jpeg", "png"] }
+mjpeg_rs = "0.0.1"
 ntcore-sys = { path = "ntcore-sys" }
 opencv = { version = "0.97.2", features = ["clang-runtime"] }
 

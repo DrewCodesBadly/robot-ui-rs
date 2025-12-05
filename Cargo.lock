@@ -2166,6 +2166,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "mjpeg_rs"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0286c84e99db6b13889a4e5a982f20014c26c5ae6fb9881208774e071cc4ecc7"
+
+[[package]]
 name = "moxcms"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3271,6 +3277,7 @@ dependencies = [
  "egui",
  "egui_extras",
  "image",
+ "mjpeg_rs",
  "ntcore-sys",
  "opencv",
 ]

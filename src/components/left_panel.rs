@@ -2,7 +2,7 @@ use std::ptr::slice_from_raw_parts;
 
 use egui::{ColorImage, Image, SidePanel, load::SizedTexture};
 use opencv::{
-    core::{CV_8UC3, Mat, MatExprTraitConst, MatTraitConst},
+    core::{CV_8U, CV_8UC3, Mat, MatExprTraitConst, MatTraitConst},
     videoio::VideoCaptureTrait,
 };
 
@@ -15,16 +15,35 @@ pub fn left_panel(ctx: &egui::Context, app: &mut FrcUi) {
                 ui.weak(format!("Camera Feed: {}", name));
                 let mut mat = Mat::default();
                 // If capture failed, show a blank image.
-                if capture.read(&mut mat).ok().filter(|b| *b).is_none() {
+                let capture_status = capture.read(&mut mat);
+                println!("{:?}", capture_status);
+                if capture_status.ok().filter(|b| *b).is_none() {
                     // Black screen
-                    mat = Mat::zeros(480, 640, CV_8UC3)
-                        .expect("base mat should be valid")
+                    // mat = Mat::zeros(480, 640, CV_8UC3)
+                    //     .expect("base mat should be valid")
+                    //     .to_mat()
+                    //     .expect("base mat should be valid");
+
+                    // TEST: Changing screen
+                    let zeros_mat = Mat::zeros(480, 640, CV_8UC3)
+                        .expect("bad mat")
                         .to_mat()
-                        .expect("base mat should be valid");
+                        .expect("bad mat");
+                    app.tmp = (app.tmp + 1) % 256;
+                    let _ = opencv::core::add(
+                        &zeros_mat,
+                        &(app.tmp as f64),
+                        &mut mat,
+                        &Mat::ones(480, 640, CV_8U).unwrap().to_mat().unwrap(),
+                        CV_8UC3,
+                    );
                 }
                 let unsafe_slice =
                     unsafe { slice_from_raw_parts(mat.data(), mat.total() * 3).as_ref() };
                 if let Some(slice) = unsafe_slice {
+                    // let mjpg_res = app.m.update_jpeg(slice.iter().cloned().collect());
+                    // println!("{:?}", mjpg_res);
+
                     let image =
                         ColorImage::from_rgb([mat.cols() as usize, mat.rows() as usize], slice);
                     let tex =

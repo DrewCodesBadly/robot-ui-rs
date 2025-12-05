@@ -34,13 +34,15 @@ pub fn bottom_panel(ctx: &egui::Context, app: &mut FrcUi) {
                         }
                     });
 
-                unsafe {
-                    NT_SetString(
-                        get_entry_handle(nt_paths::AUTO_CHOOSER_ACTIVE, app.nt),
-                        0,
-                        &to_wpi_string(&selected),
-                    )
-                };
+                if selected != "None" {
+                    unsafe {
+                        NT_SetString(
+                            get_entry_handle(nt_paths::AUTO_CHOOSER_ACTIVE, app.nt),
+                            0,
+                            &to_wpi_string(&selected),
+                        )
+                    };
+                }
             });
         });
     });

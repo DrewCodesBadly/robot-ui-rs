@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc, thread};
 
 use egui::{Context, DragValue, Id, Modal};
+use mjpeg_rs::MJpeg;
 use ntcore_sys::{
     NT_CreateInstance, NT_GetBoolean, NT_GetDouble, NT_GetDoubleArray, NT_GetString,
     NT_GetStringArray, NT_Inst, NT_SetServerTeam, NT_StartClient4, WPI_String,
@@ -33,6 +34,9 @@ struct FrcUi {
     camera_streams: HashMap<String, VideoCapture>,
     settings_modal_open: bool,
     listened_values: ListenedValues,
+
+    m: Arc<MJpeg>,
+    tmp: usize,
 }
 
 impl FrcUi {
@@ -49,6 +53,10 @@ impl FrcUi {
             String::from("Shooter Limelight"),
             String::from("0.0.0.0:5800"),
         );
+
+        let m = Arc::new(MJpeg::new());
+        let m_c = m.clone();
+        thread::spawn(move || m_c.run("127.0.0.1:8081").unwrap());
 
         // Set up NT
         let nt = unsafe { NT_CreateInstance() };
@@ -70,6 +78,9 @@ impl FrcUi {
             nt,
             camera_ips,
             listened_values,
+
+            m,
+            tmp: 0,
         };
 
         s.try_reconnect();

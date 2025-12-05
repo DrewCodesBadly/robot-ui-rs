@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ffi::c_void};
 
 use ntcore_sys::{
-    NT_AddListener, NT_Event, NT_EventFlags_NT_EVENT_VALUE_ALL, NT_GetEntry, NT_Inst,
+    NT_AddListener, NT_Event, NT_EventFlags_NT_EVENT_VALUE_ALL, NT_GetEntry, NT_Handle, NT_Inst,
     NT_Type_NT_BOOLEAN, NT_Type_NT_DOUBLE, NT_Type_NT_DOUBLE_ARRAY, NT_Type_NT_STRING, WPI_String,
 };
 
@@ -58,7 +58,7 @@ pub fn add_listener(map: &mut HashMap<String, NTValueType>, entry_name: &str, in
 pub extern "C" fn nt_update(data: *mut c_void, event: *const NT_Event) {
     #[cfg(debug_assertions)]
     println!("Receiving NT Update...");
-    let mut map = unsafe { data.cast::<HashMap<String, NTValueType>>().read() };
+    let mut map = unsafe { data.cast::<&mut HashMap<String, NTValueType>>().read() };
     let event = unsafe { event.read() };
 
     let value = unsafe {
@@ -84,11 +84,11 @@ pub extern "C" fn nt_update(data: *mut c_void, event: *const NT_Event) {
         }
     };
 
-    let name = from_wpi_string(unsafe { event.data.topicInfo.name });
+    // let name = from_wpi_string(unsafe { event.data.topicInfo.name });
 
     #[cfg(debug_assertions)]
-    println!("Setting NT Data: {} = {:?}", name, value);
-    map.insert(name, value);
+    println!("Setting NT Data: {} = {:?}", "gameTime", value);
+    map.insert("gameTime".to_string(), value);
 }
 
 pub fn format_game_time(time: Option<f64>) -> String {
@@ -98,4 +98,8 @@ pub fn format_game_time(time: Option<f64>) -> String {
     } else {
         String::from("--:--")
     }
+}
+
+pub fn get_entry_handle(path: &str, inst: u32) -> NT_Handle {
+    unsafe { NT_GetEntry(inst, &to_wpi_string(path)) }
 }

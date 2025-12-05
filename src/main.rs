@@ -1,10 +1,16 @@
 use std::collections::HashMap;
 
-use egui::{CentralPanel, Context, DragValue, Id, Modal, SidePanel};
-use ntcore_sys::{NT_CreateInstance, NT_Inst, NT_SetServerTeam, NT_StartClient4};
+use egui::{Context, DragValue, Id, Modal};
+use ntcore_sys::{
+    NT_CreateInstance, NT_GetDouble, NT_GetDoubleArray, NT_GetString, NT_Inst, NT_SetServerTeam,
+    NT_StartClient4,
+};
 use opencv::videoio::{CAP_ANY, VideoCapture};
 
-use crate::nt_util::{ListenedValues, NTValueType, add_listener, to_wpi_string};
+use crate::{
+    nt_paths::LUNITE_COUNT,
+    nt_util::{ListenedValues, NTValueType, from_wpi_string, get_entry_handle, to_wpi_string},
+};
 
 mod components;
 mod nt_paths;
@@ -27,12 +33,16 @@ struct FrcUi {
     camera_streams: HashMap<String, VideoCapture>,
     settings_modal_open: bool,
     listened_values: ListenedValues,
+
+    tmp: u32,
 }
 
 impl FrcUi {
     fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         let mut camera_ips = HashMap::new();
         // Add cameras here
+        // camera_ips.insert(String::from("ll-front"), String::from("10.87.26.11:5800"));
+        // camera_ips.insert(String::from("ll-back"), String::from("10.87.26.12:5800"));
         camera_ips.insert(String::from("ll-front"), String::from("0.0.0.0:5800"));
         camera_ips.insert(String::from("ll-back"), String::from("0.0.0.0:5800"));
 
@@ -42,20 +52,22 @@ impl FrcUi {
 
         // Start listening to needed values
         let mut listened_values = HashMap::new();
-        add_listener(&mut listened_values, nt_paths::GAME_TIME, nt);
-        add_listener(&mut listened_values, nt_paths::CURRENT_STATE, nt);
-        add_listener(&mut listened_values, nt_paths::KNOWN_LUNITE_POSITIONS, nt);
-        add_listener(&mut listened_values, nt_paths::LUNITE_COUNT, nt);
-        add_listener(&mut listened_values, nt_paths::ROBOT_2D_POSITION, nt);
+        // add_listener(&mut listened_values, nt_paths::GAME_TIME, nt);
+        // add_listener(&mut listened_values, nt_paths::CURRENT_STATE, nt);
+        // add_listener(&mut listened_values, nt_paths::KNOWN_LUNITE_POSITIONS, nt);
+        // add_listener(&mut listened_values, nt_paths::LUNITE_COUNT, nt);
+        // add_listener(&mut listened_values, nt_paths::ROBOT_2D_POSITION, nt);
 
         let mut s = Self {
             settings_modal_open: false,
-            team_number: 1234,
+            team_number: 8726,
             port: 5810,
             camera_streams: HashMap::new(),
             nt,
             camera_ips,
             listened_values,
+
+            tmp: 200,
         };
 
         s.try_reconnect();
@@ -83,6 +95,60 @@ impl FrcUi {
             }
         }
     }
+
+    // scuffed way to do this, but alas, listeners cause a crash I can't debug easily.
+    fn update_nt_values(&mut self) {
+        // gameTime
+        let game_time =
+            unsafe { NT_GetDouble(get_entry_handle(nt_paths::GAME_TIME, self.nt), -1.0) };
+        let lunite_count =
+            unsafe { NT_GetDouble(get_entry_handle(nt_paths::LUNITE_COUNT, self.nt), -1.0) };
+        let mut current_state = to_wpi_string("Unknown");
+        unsafe {
+            NT_GetString(
+                get_entry_handle(nt_paths::CURRENT_STATE, self.nt),
+                &to_wpi_string("Unknown"),
+                &mut current_state,
+            )
+        };
+        for string in [
+            nt_paths::ROBOT_2D_POSITION.to_string(),
+            nt_paths::KNOWN_LUNITE_POSITIONS.to_string(),
+        ] {
+            let arr = Vec::<f64>::new();
+            let mut arr_len = 0usize;
+            let out_ptr = unsafe {
+                NT_GetDoubleArray(
+                    get_entry_handle(&string, self.nt),
+                    arr.as_ptr(),
+                    0,
+                    &mut arr_len,
+                )
+            };
+            if arr_len > 0 {
+                self.listened_values.insert(string, unsafe {
+                    NTValueType::DoubleArray(Vec::from_raw_parts(out_ptr, arr_len, arr_len))
+                });
+            }
+        }
+
+        self.listened_values.insert(
+            nt_paths::CURRENT_STATE.to_string(),
+            NTValueType::String(from_wpi_string(current_state)),
+        );
+        if game_time != -1.0 {
+            self.listened_values.insert(
+                nt_paths::GAME_TIME.to_string(),
+                NTValueType::Double(game_time),
+            );
+        }
+        if lunite_count != -1.0 {
+            self.listened_values.insert(
+                nt_paths::LUNITE_COUNT.to_string(),
+                NTValueType::Double(lunite_count),
+            );
+        }
+    }
 }
 
 impl eframe::App for FrcUi {
@@ -93,18 +159,7 @@ impl eframe::App for FrcUi {
             include_bytes!("assets/bbots25-field.png"),
         );
 
-        #[cfg(debug_assertions)]
-        {
-            use ntcore_sys::{NT_GetDouble, NT_GetEntry};
-
-            let h = unsafe { NT_GetEntry(self.nt, &to_wpi_string(nt_paths::GAME_TIME)) };
-            let d = unsafe { NT_GetDouble(h, -1.0) };
-            if d != -1.0 {
-                println!("Found NT Value for gameTime: {}", d);
-            } else {
-                println!("Could not find gameTime value.");
-            }
-        }
+        self.update_nt_values();
 
         components::top_bar::top_bar(ctx, &self.listened_values);
 
@@ -138,6 +193,9 @@ impl eframe::App for FrcUi {
                     });
 
                     ui.separator();
+                    ui.label("This will stall for a while while trying to connect to cameras!");
+                    ui.label("Don't worry, it didn't crash.");
+                    ui.label("Maybe I'll multithread this in the future to avoid this...");
                     if ui.button("Save, Reconnect and Close").clicked() {
                         self.try_reconnect();
                         self.update_cameras();

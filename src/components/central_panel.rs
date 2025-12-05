@@ -1,27 +1,61 @@
-use egui::{CentralPanel, Color32, Frame, Image, Pos2, SidePanel, TopBottomPanel};
+use std::{iter::repeat_n, ptr::slice_from_raw_parts};
+
+use egui::{
+    CentralPanel, Color32, ColorImage, Frame, Image, Pos2, SidePanel, TopBottomPanel,
+    load::SizedTexture,
+};
 use opencv::{
-    core::{Mat, Vector},
+    core::{CV_8U, CV_8UC3, Mat, MatExpr, MatExprTraitConst, MatTrait, MatTraitConst, Vector},
     imgcodecs::imencode,
+    traits::Boxed,
     videoio::VideoCaptureTrait,
 };
 
-use crate::{FrcUi, nt_paths, nt_util::NTValueType};
+use crate::{
+    FrcUi, components::input_descriptions::show_input_bindings, nt_paths, nt_util::NTValueType,
+};
 
 pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
     SidePanel::left("LeftCamerasPanel").show(ctx, |ui| {
         ui.vertical(|ui| {
             for (name, capture) in &mut app.camera_streams {
+                ui.label(format!("Camera Feed: {}", name));
                 let mut mat = Mat::default();
-                if let Ok(true) = capture.read(&mut mat) {
-                    // re-encoding is jank but whatever I guess.
-                    // its easier and im tired.
-                    let mut buffer = Vector::new();
-                    if let Ok(true) = imencode(".png", &mat, &mut buffer, &Vector::new()) {
-                        ui.add(Image::from_bytes(
-                            "bytes://camera_bytes",
-                            buffer.as_slice().to_vec(),
-                        ));
-                    }
+                // If capture failed, show a blank image.
+                if capture.read(&mut mat).ok().filter(|b| *b).is_none() {
+                    // Black screen
+                    mat = Mat::zeros(480, 640, CV_8UC3)
+                        .expect("base mat should be valid")
+                        .to_mat()
+                        .expect("base mat should be valid");
+
+                    // Changing image (for testing purposes)
+                    // let zeros_mat = Mat::zeros(480, 640, CV_8UC3)
+                    //     .expect("base mat should be valid")
+                    //     .to_mat()
+                    //     .expect("base mat should be valid");
+                    // app.tmp = (app.tmp + 1) % 256;
+                    // println!("{}", app.tmp);
+                    // let _ = opencv::core::add(
+                    //     &zeros_mat,
+                    //     &(app.tmp as f64),
+                    //     &mut mat,
+                    //     &Mat::ones(480, 640, CV_8U).unwrap().to_mat().unwrap(),
+                    //     CV_8UC3,
+                    // );
+                }
+                let unsafe_slice =
+                    unsafe { slice_from_raw_parts(mat.data(), mat.total() * 3).as_ref() };
+                if let Some(slice) = unsafe_slice {
+                    let image =
+                        ColorImage::from_rgb([mat.cols() as usize, mat.rows() as usize], slice);
+                    let tex =
+                        ctx.load_texture(&format!("camera-{}", name), image, Default::default());
+                    ui.add(
+                        Image::new(SizedTexture::from_handle(&tex))
+                            .maintain_aspect_ratio(true)
+                            .shrink_to_fit(),
+                    );
                 }
             }
         });
@@ -84,5 +118,7 @@ pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
                 }
             }
         });
+
+        show_input_bindings(ui, app);
     });
 }

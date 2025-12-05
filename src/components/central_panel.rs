@@ -87,7 +87,7 @@ pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
             &gt_string,
             0.0,
             TextFormat {
-                font_id: FontId::proportional(25.0),
+                font_id: FontId::proportional(30.0),
                 ..Default::default()
             },
         );
@@ -98,7 +98,7 @@ pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
                 "RED ",
                 0.0,
                 TextFormat {
-                    font_id: FontId::proportional(25.0),
+                    font_id: FontId::proportional(30.0),
                     color: Color32::from_rgb(255, 50, 50),
                     ..Default::default()
                 },
@@ -108,7 +108,7 @@ pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
                 "BLUE ",
                 0.0,
                 TextFormat {
-                    font_id: FontId::proportional(25.0),
+                    font_id: FontId::proportional(30.0),
                     color: Color32::from_rgb(50, 50, 255),
                     ..Default::default()
                 },
@@ -118,7 +118,7 @@ pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
             "ALLIANCE",
             0.0,
             TextFormat {
-                font_id: FontId::proportional(25.0),
+                font_id: FontId::proportional(30.0),
                 ..Default::default()
             },
         );

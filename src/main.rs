@@ -41,8 +41,14 @@ impl FrcUi {
         // Add cameras here
         // camera_ips.insert(String::from("ll-front"), String::from("10.87.26.11:5800"));
         // camera_ips.insert(String::from("ll-back"), String::from("10.87.26.12:5800"));
-        camera_ips.insert(String::from("ll-front"), String::from("0.0.0.0:5800"));
-        camera_ips.insert(String::from("ll-back"), String::from("0.0.0.0:5800"));
+        camera_ips.insert(
+            String::from("Intake Limelight"),
+            String::from("0.0.0.0:5800"),
+        );
+        camera_ips.insert(
+            String::from("Shooter Limelight"),
+            String::from("0.0.0.0:5800"),
+        );
 
         // Set up NT
         let nt = unsafe { NT_CreateInstance() };
@@ -204,7 +210,7 @@ impl eframe::App for FrcUi {
         );
         ctx.all_styles_mut(|style| {
             style.override_font_id = Some(egui::FontId {
-                size: 16.0,
+                size: 20.0,
                 family: egui::FontFamily::Proportional,
             });
         });

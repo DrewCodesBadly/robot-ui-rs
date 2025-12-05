@@ -1,9 +1,10 @@
 use std::{iter::repeat_n, ptr::slice_from_raw_parts};
 
 use egui::{
-    CentralPanel, Color32, ColorImage, Frame, Image, Pos2, SidePanel, TopBottomPanel,
-    load::SizedTexture,
+    Button, CentralPanel, Color32, ColorImage, ComboBox, Frame, Image, Pos2, SidePanel,
+    TopBottomPanel, load::SizedTexture,
 };
+use ntcore_sys::NT_SetString;
 use opencv::{
     core::{CV_8U, CV_8UC3, Mat, MatExpr, MatExprTraitConst, MatTrait, MatTraitConst, Vector},
     imgcodecs::imencode,
@@ -12,7 +13,10 @@ use opencv::{
 };
 
 use crate::{
-    FrcUi, components::input_descriptions::show_input_bindings, nt_paths, nt_util::NTValueType,
+    FrcUi,
+    components::input_descriptions::show_input_bindings,
+    nt_paths,
+    nt_util::{NTValueType, get_entry_handle, to_wpi_string},
 };
 
 pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
@@ -62,9 +66,39 @@ pub fn central_panel(ctx: &egui::Context, app: &mut FrcUi) {
     });
 
     TopBottomPanel::bottom("BottomPanel").show(ctx, |ui| {
-        if ui.button("Connection Settings").clicked() {
-            app.settings_modal_open = true;
-        }
+        ui.horizontal(|ui| {
+            if ui.button("Connection Settings").clicked() {
+                app.settings_modal_open = true;
+            }
+            let auto_chooser_box = ComboBox::new("AutoChooserBox", "selected as current auto.");
+            let mut selected = {
+                let val = app.listened_values.get(nt_paths::AUTO_CHOOSER_ACTIVE);
+                if let Some(NTValueType::String(s)) = val {
+                    s.to_owned()
+                } else {
+                    String::from("None")
+                }
+            };
+            auto_chooser_box
+                .selected_text(selected.clone())
+                .show_ui(ui, |inner_ui| {
+                    if let Some(NTValueType::StringArray(arr)) =
+                        app.listened_values.get(nt_paths::AUTO_CHOOSER_OPTIONS)
+                    {
+                        for option in arr {
+                            inner_ui.selectable_value(&mut selected, option.to_owned(), option);
+                        }
+                    }
+                });
+
+            unsafe {
+                NT_SetString(
+                    get_entry_handle(nt_paths::AUTO_CHOOSER_ACTIVE, app.nt),
+                    0,
+                    &to_wpi_string(&selected),
+                )
+            };
+        });
     });
 
     CentralPanel::default().show(ctx, |ui| {

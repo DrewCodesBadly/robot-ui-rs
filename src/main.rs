@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ptr::slice_from_raw_parts};
 
 use egui::{Context, DragValue, Id, Modal};
 use ntcore_sys::{
-    NT_CreateInstance, NT_GetDouble, NT_GetDoubleArray, NT_GetString, NT_Inst, NT_SetServerTeam,
-    NT_StartClient4,
+    NT_CreateInstance, NT_GetDouble, NT_GetDoubleArray, NT_GetString, NT_GetStringArray, NT_Inst,
+    NT_SetServerTeam, NT_StartClient4, WPI_String,
 };
 use opencv::videoio::{CAP_ANY, VideoCapture};
 
@@ -97,12 +97,29 @@ impl FrcUi {
     }
 
     // scuffed way to do this, but alas, listeners cause a crash I can't debug easily.
+    // Ideally I would refactor this with functions and a nicer setup buuut
+    // too late.
+    // NOTE: NTHandle structs appear to not need to be freed. I know this *looks*
+    // like a huge memory leak but it hasn't caused issues yet and there literally
+    // isn't an exposed function to free handles that I can find.
     fn update_nt_values(&mut self) {
         // gameTime
         let game_time =
             unsafe { NT_GetDouble(get_entry_handle(nt_paths::GAME_TIME, self.nt), -1.0) };
+        if game_time != -1.0 {
+            self.listened_values.insert(
+                nt_paths::GAME_TIME.to_string(),
+                NTValueType::Double(game_time),
+            );
+        }
         let lunite_count =
             unsafe { NT_GetDouble(get_entry_handle(nt_paths::LUNITE_COUNT, self.nt), -1.0) };
+        if lunite_count != -1.0 {
+            self.listened_values.insert(
+                nt_paths::LUNITE_COUNT.to_string(),
+                NTValueType::Double(lunite_count),
+            );
+        }
         let mut current_state = to_wpi_string("Unknown");
         unsafe {
             NT_GetString(
@@ -111,6 +128,10 @@ impl FrcUi {
                 &mut current_state,
             )
         };
+        self.listened_values.insert(
+            nt_paths::CURRENT_STATE.to_string(),
+            NTValueType::String(from_wpi_string(current_state)),
+        );
         for string in [
             nt_paths::ROBOT_2D_POSITION.to_string(),
             nt_paths::KNOWN_LUNITE_POSITIONS.to_string(),
@@ -132,22 +153,40 @@ impl FrcUi {
             }
         }
 
+        // Auto chooser
+        let str_arr = Vec::<WPI_String>::new();
+        let mut arr_len = 0usize;
+        let out_ptr = unsafe {
+            NT_GetStringArray(
+                get_entry_handle(nt_paths::AUTO_CHOOSER_OPTIONS, self.nt),
+                str_arr.as_ptr(),
+                0,
+                &mut arr_len,
+            )
+        };
+        if arr_len > 0 {
+            self.listened_values
+                .insert(nt_paths::AUTO_CHOOSER_OPTIONS.to_string(), unsafe {
+                    NTValueType::StringArray(
+                        Vec::<WPI_String>::from_raw_parts(out_ptr, arr_len, arr_len)
+                            .iter()
+                            .map(|w| from_wpi_string(*w))
+                            .collect(),
+                    )
+                });
+        }
+        let mut selected_auto = to_wpi_string("None");
+        unsafe {
+            NT_GetString(
+                get_entry_handle(nt_paths::AUTO_CHOOSER_ACTIVE, self.nt),
+                &to_wpi_string("None"),
+                &mut selected_auto,
+            )
+        };
         self.listened_values.insert(
-            nt_paths::CURRENT_STATE.to_string(),
-            NTValueType::String(from_wpi_string(current_state)),
+            nt_paths::AUTO_CHOOSER_ACTIVE.to_string(),
+            NTValueType::String(from_wpi_string(selected_auto)),
         );
-        if game_time != -1.0 {
-            self.listened_values.insert(
-                nt_paths::GAME_TIME.to_string(),
-                NTValueType::Double(game_time),
-            );
-        }
-        if lunite_count != -1.0 {
-            self.listened_values.insert(
-                nt_paths::LUNITE_COUNT.to_string(),
-                NTValueType::Double(lunite_count),
-            );
-        }
     }
 }
 
